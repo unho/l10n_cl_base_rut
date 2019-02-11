@@ -4,6 +4,10 @@ from odoo.exceptions import except_orm, UserError
 import re
 
 
+CL_FACTORS = [3, 2, 7, 6, 5, 4, 3, 2]
+CL_VERIFICATION_DIGITS = '0123456789K0'
+
+
 class res_partner(models.Model):
     _inherit = 'res.partner'
 
@@ -17,24 +21,21 @@ class res_partner(models.Model):
         store=True, compute_sudo=False)
 
     def check_vat_cl(self, vat):
-        body, vdig = '', ''
+        """Perform VAT number validation for Chile RUT number.
+
+        Also see https://es.wikipedia.org/wiki/Rol_%C3%9Anico_Tributario
+        """
         if len(vat) > 9:
             vat = vat.replace('-', '', 1).replace('.', '', 2)
+
         if len(vat) != 9:
             return False
-        else:
-            body, vdig = vat[:-1], vat[-1].upper()
-        try:
-            vali = range(2, 8) + [2, 3]
-            operar = '0123456789K0'[11 - (
-                sum([int(digit)*factor for digit, factor in zip(
-                    body[::-1], vali)]) % 11)]
-            if operar == vdig:
-                return True
-            else:
-                return False
-        except IndexError:
-            return False
+
+        body, verification_digit = vat[:-1], vat[-1].upper()
+        total = sum(int(digit) * factor
+                    for digit, factor in zip(body, CL_FACTORS))
+
+        return verification_digit == CL_VERIFICATION_DIGITS[11 - (total % 11)]
 
     @staticmethod
     def format_document_number(vat):
